@@ -6,7 +6,13 @@
 /**
  * TODO: Student Implement
  */
-TableIterator::TableIterator(TableHeap *table_heap, RowId rid, Txn *txn) {}
+TableIterator::TableIterator(TableHeap *table_heap, RowId rid, Txn *txn) {
+  LOG(INFO) << "---into TableIterator constructor---";
+  Row *row = new Row(rid);
+  if(rid.GetPageId() != INVALID_PAGE_ID) {
+    table_heap->GetTuple(row,txn);
+  }
+}
 
 TableIterator::TableIterator(const TableIterator &other) {
 

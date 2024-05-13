@@ -40,7 +40,32 @@ Column::Column(const Column *other)
 */
 uint32_t Column::SerializeTo(char *buf) const {
   // replace with your code here
-  return 0;
+  LOG(INFO) << "----INTO Column::SerializeTo()----";
+  uint32_t buf_offset = 0;
+  uint32_t type_size = sizeof(TypeId);
+  MACH_WRITE_TO(TypeId,buf+buf_offset, GetType());
+  buf_offset += type_size;
+
+  uint32_t len_size = sizeof(GetLength());
+  MACH_WRITE_UINT32(buf+buf_offset, GetLength());
+  buf_offset += len_size;
+  // 之所以把name放在后面序列化，是为了避免反序列化的时候找不到name的长度，这里竟然能有trick
+  uint32_t column_name_size = MACH_STR_SERIALIZED_SIZE(GetName());
+  MACH_WRITE_STRING(buf+buf_offset, GetName());
+  buf_offset += column_name_size;
+
+  uint32_t table_ind_size = sizeof(GetTableInd());
+  MACH_WRITE_UINT32(buf+buf_offset, GetTableInd());
+  buf_offset += table_ind_size;
+
+  uint32_t nullable_size = sizeof(IsNullable());
+  MACH_WRITE_TO(bool,buf+buf_offset, IsNullable());
+  buf_offset += nullable_size;
+
+  uint32_t unique_size = sizeof(IsUnique());
+  MACH_WRITE_TO(bool,buf+buf_offset, IsUnique());
+  buf_offset += unique_size;
+  return buf_offset;
 }
 
 /**
@@ -48,13 +73,48 @@ uint32_t Column::SerializeTo(char *buf) const {
  */
 uint32_t Column::GetSerializedSize() const {
   // replace with your code here
-  return 0;
+  LOG(INFO) << "----INTO Column::GetSerializedSize()----";
+  return MACH_STR_SERIALIZED_SIZE(GetName()) + sizeof(TypeId) + sizeof(GetLength()) + sizeof(GetTableInd()) + sizeof(IsNullable()) + sizeof(IsUnique());
 }
 
 /**
  * TODO: Student Implement
  */
 uint32_t Column::DeserializeFrom(char *buf, Column *&column) {
+  LOG(INFO) << "----INTO Column::DeserializeFrom()----";
   // replace with your code here
-  return 0;
+  uint32_t buf_offset = 0;
+
+  TypeId type;
+  uint32_t type_size = sizeof(type);
+  type = MACH_READ_FROM(TypeId,buf+buf_offset);
+  buf_offset += type_size;
+
+  uint32_t len;
+  uint32_t len_size = sizeof(len);
+  len  = MACH_READ_UINT32(buf+buf_offset,buf+buf_offset);
+  buf_offset += len_size;
+
+  char *name  = new char[len];
+  memcpy(name, buf+buf_offset, len);
+  buf_offset += len;
+
+  uint32_t table_ind;
+  uint32_t table_ind_size = sizeof(table_ind);
+  table_ind = MACH_READ_UINT32(buf+buf_offset,buf+buf_offset);
+  buf_offset += table_ind_size;
+
+  bool nullable;
+  uint32_t nullable_size = sizeof(nullable);
+  nullable = MACH_READ_FROM(bool,buf+buf_offset);
+  buf_offset += nullable_size;
+
+  bool unique;
+  uint32_t unique_size = sizeof(unique);
+  unique = MACH_READ_FROM(bool,buf+buf_offset);
+  buf_offset += unique_size;
+
+  column = new Column(name, type, len, table_ind, nullable, unique);
+  delete[] name;
+  return buf_offset;
 }
