@@ -8,21 +8,23 @@
  * TODO: Student Implement
  */
 bool BPlusTreePage::IsLeafPage() const {
-  return false;
+  // 直接返回对于类别的判定
+  return page_type_ == IndexPageType::LEAF_PAGE;;
 }
 
 /**
  * TODO: Student Implement
  */
 bool BPlusTreePage::IsRootPage() const {
-  return false;
+  // 如果是根节点则没有父节点
+  return page_type_ != IndexPageType::INVALID_INDEX_PAGE;
 }
 
 /**
  * TODO: Student Implement
  */
 void BPlusTreePage::SetPageType(IndexPageType page_type) {
-
+  page_type_ = page_type;
 }
 
 int BPlusTreePage::GetKeySize() const {
@@ -56,14 +58,14 @@ void BPlusTreePage::IncreaseSize(int amount) {
  * TODO: Student Implement
  */
 int BPlusTreePage::GetMaxSize() const {
-  return 0;
+  return max_size_;
 }
 
 /**
  * TODO: Student Implement
  */
 void BPlusTreePage::SetMaxSize(int size) {
-
+  max_size_ = size;
 }
 
 /*
@@ -74,7 +76,8 @@ void BPlusTreePage::SetMaxSize(int size) {
  * TODO: Student Implement
  */
 int BPlusTreePage::GetMinSize() const {
-  return 0;
+  // 此处可能会涉及到节点（增加或删除）时，中位数的划分位置，此处不做向上取整，如果出现节点变化不正确的情况，请优先检查此处
+  return max_size_ / 2;
 }
 
 /*
@@ -84,7 +87,7 @@ int BPlusTreePage::GetMinSize() const {
  * TODO: Student Implement
  */
 page_id_t BPlusTreePage::GetParentPageId() const {
-  return INVALID_PAGE_ID;
+  return parent_page_id_;
 }
 
 void BPlusTreePage::SetParentPageId(page_id_t parent_page_id) {
