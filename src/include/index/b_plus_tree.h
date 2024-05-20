@@ -21,7 +21,8 @@
  * (3) The structure should shrink and grow dynamically
  * (4) Implement index iterator for range scan
  */
-class BPlusTree {
+class
+BPlusTree {
   using InternalPage = BPlusTreeInternalPage;
   using LeafPage = BPlusTreeLeafPage;
 
@@ -93,7 +94,7 @@ class BPlusTree {
 
   bool AdjustRoot(BPlusTreePage *node);
 
-  void UpdateRootPageId(int insert_record = 0);
+  void UpdateRootPageId(bool insert_record = false);
 
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out, Schema *schema) const;

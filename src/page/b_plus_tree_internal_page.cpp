@@ -106,6 +106,7 @@ page_id_t InternalPage::Lookup(const GenericKey *key, const KeyManager &KM) {
  * page, you should create a new root page and populate its elements.
  * NOTE: This method is only called within InsertIntoParent()(b_plus_tree.cpp)
  */
+// 这个函数是为了当所有的节点都满了，产生了一个新根节点，链接新旧节点，并且使用中间键值对来分割新旧节点
 void InternalPage::PopulateNewRoot(const page_id_t &old_value, GenericKey *new_key, const page_id_t &new_value) {
   SetParentPageId(INVALID_PAGE_ID);
   SetSize(2);
@@ -148,14 +149,9 @@ int InternalPage::InsertNodeAfter(const page_id_t &old_value, GenericKey *new_ke
  * buffer_pool_manager 是干嘛的？传给CopyNFrom()用于Fetch数据页
  */
 void InternalPage::MoveHalfTo(InternalPage *recipient, BufferPoolManager *buffer_pool_manager) {
-  // 复制当前页前半部分对到recipient页，并在函数内部完成size的修改
+  // 复制当前页后半部分对到recipient页，并在函数内部完成size的修改
   recipient->CopyNFrom(this, GetSize() - GetSize() / 2, buffer_pool_manager);
-  // 删除当前页前半部分对，后半部分的前移已经包含在remove里
-  for(uint32_t i = 1; i <(GetSize() -GetSize() / 2); ++i) {
-    Remove(i);
-  }
   SetSize(GetSize() / 2);
-
 }
 
 /* Copy entries into me, starting from {items} and copy {size} entries.
@@ -169,7 +165,7 @@ void InternalPage::CopyNFrom(void *src, int size, BufferPoolManager *buffer_pool
   auto this_page_id = GetPageId();
   // 先把src_page的键值对拷贝到当前页，然后更新父节点
   for (uint32_t num = 0; num < size; ++num) {
-    PairCopy(PairPtrAt(GetSize() + num), src_page->PairPtrAt(num), 1);
+    PairCopy(PairPtrAt(GetSize() + num), src_page->PairPtrAt(src_page->GetSize() - size + num), 1);
     IncreaseSize(1);
     // 更新父节点，先找到键值对所在的页，转化为BPlusTreePage指针，然后更新父节点
     auto child_page_id = src_page->ValueAt(num);
