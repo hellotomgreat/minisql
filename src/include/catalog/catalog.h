@@ -61,7 +61,7 @@ class CatalogMeta {
 
  private:
   static constexpr uint32_t CATALOG_METADATA_MAGIC_NUM = 89849;
-  std::map<table_id_t, page_id_t> table_meta_pages_;
+  std::map<table_id_t, page_id_t>table_meta_pages_;
   std::map<index_id_t, page_id_t> index_meta_pages_;
 };
 

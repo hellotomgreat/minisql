@@ -529,14 +529,15 @@ Page *BPlusTree::FindLeafPage(const GenericKey *key , page_id_t page_id, bool le
  * insert a record <index_name, current_page_id> into header page instead of
  * updating it.
  */
+// 这里对于输入参数进行了修改，原来的输入是int,但我感觉boolg更合适
 void BPlusTree::UpdateRootPageId(bool insert_record) {
   auto *page = buffer_pool_manager_->FetchPage(INDEX_ROOTS_PAGE_ID);
   auto *root_page = reinterpret_cast<IndexRootsPage *>(page->GetData());
 
-  if(insert_record){ //插入(新建)
+  if(insert_record){
     root_page->Insert(index_id_, root_page_id_);
   }
-  else{ //更新
+  else{
     root_page->Update(index_id_, root_page_id_);
   }
 
