@@ -223,11 +223,15 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
                                     const string &index_type) {
   // ASSERT(false, "Not Implemented yet");
   LOG(INFO)<< "into CatalogManager::CreateIndex";
+  if (table_names_.count(table_name) <= 0)
+    return DB_TABLE_NOT_EXIST;
+
   if(index_names_.count(index_name) > 0) {
     return DB_INDEX_ALREADY_EXIST;
   }
   page_id_t index_meta_page_id;
-  index_id_t index_id = next_index_id_++;
+  index_id_t index_id = next_index_id_;
+  next_index_id_++;
   buffer_pool_manager_->NewPage(index_meta_page_id);
   if (index_meta_page_id== INVALID_PAGE_ID) {
     return DB_FAILED;
@@ -238,8 +242,10 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   uint32_t key_index;
   // 根据初始化参数要求倒推，需要获得key_map
   for(auto key:index_keys) {
-    if(table_schema->GetColumnIndex(key,key_index) != DB_FAILED)
+    if(table_schema->GetColumnIndex(key,key_index) != DB_INDEX_NOT_FOUND)
       key_map.push_back(key_index);
+    else
+      return DB_COLUMN_NAME_NOT_EXIST;
   }
   IndexMetadata *index_meta = IndexMetadata::Create(index_id, index_name, table_id,key_map);
   if (index_meta == nullptr) {
@@ -271,6 +277,7 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
 
   buffer_pool_manager_->UnpinPage(index_meta_page_id, true);
   buffer_pool_manager_->UnpinPage(META_PAGE_ID, true);
+  return DB_SUCCESS;
 }
 /**
  * TODO: Student Implement
@@ -297,7 +304,7 @@ dberr_t CatalogManager::GetTableIndexes(const std::string &table_name, std::vect
     return DB_TABLE_NOT_EXIST;
   unordered_map<string, unordered_map<string, index_id_t>>::mapped_type index_name_to_id = index_names_.at(table_name);
   for(auto index_id:index_name_to_id) {
-    indexes.push_back(indexes_.at(index_id.second()));
+    indexes.push_back(indexes_.at(index_id.second));
   }
   return DB_SUCCESS;
 }
@@ -315,7 +322,7 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
   catalog_meta_->table_meta_pages_.erase(table_id);
   // 再删除表的索引
   for(auto index_id:index_names_.at(table_name)) {
-    catalog_meta_->index_meta_pages_.erase(index_id.second());
+    catalog_meta_->index_meta_pages_.erase(index_id.second);
   }
   // 最后删除表的表信息
   tables_.erase(table_id);

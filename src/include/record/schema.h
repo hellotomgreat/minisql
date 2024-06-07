@@ -34,7 +34,7 @@ class Schema {
         return DB_SUCCESS;
       }
     }
-    return DB_COLUMN_NAME_NOT_EXIST;
+    return DB_INDEX_NOT_FOUND;
   }
 
   inline uint32_t GetColumnCount() const { return static_cast<uint32_t>(columns_.size()); }
