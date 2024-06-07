@@ -27,6 +27,7 @@ void LRUReplacer::Pin(frame_id_t frame_id) {
  * TODO: Student Implement
  */
 void LRUReplacer::Unpin(frame_id_t frame_id) {
+  for (list<frame_id_t>::iterator it = lru_list.begin(); it!=lru_list.end(); ++it) if (*it == frame_id) return;
   lru_list.push_front(frame_id);
 }
 

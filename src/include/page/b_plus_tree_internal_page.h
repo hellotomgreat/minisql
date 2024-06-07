@@ -53,7 +53,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   page_id_t RemoveAndReturnOnlyChild();
 
   // Split and Merge utility methods
-  void MoveAllTo(BPlusTreeInternalPage *recipient, GenericKey *middle_key, BufferPoolManager *buffer_pool_manager);
+  void MoveAllTo(BPlusTreeInternalPage *recipient, GenericKey *middle_key, BufferPoolManager *buffer_pool_manager, int index);
 
   void MoveHalfTo(BPlusTreeInternalPage *recipient, BufferPoolManager *buffer_pool_manager);
 
@@ -64,7 +64,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
                          BufferPoolManager *buffer_pool_manager);
 
  private:
-  void CopyNFrom(void *src, int size, BufferPoolManager *buffer_pool_manager);
+  void CopyNFrom(void *src, int size, BufferPoolManager *buffer_pool_manager, int index);
 
   void CopyLastFrom(GenericKey *key, page_id_t value, BufferPoolManager *buffer_pool_manager);
 

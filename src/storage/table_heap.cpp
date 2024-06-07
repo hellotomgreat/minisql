@@ -23,6 +23,11 @@ bool TableHeap::InsertTuple(Row &row, Txn *txn) {
     if(now_page->GetNextPageId() != INVALID_PAGE_ID) {
       page_id_t next_page_id = now_page->GetNextPageId();
       // 跳转到下一页
+      /*
+       *---UPDATE----
+       *每一次Fetch完的page不要用了都应当Unpin
+       */
+      buffer_pool_manager_->UnpinPage(now_page_id,false); //因为是没能成功插入的page，没有修改数据。
       now_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(next_page_id));
     }
     else{
@@ -30,13 +35,15 @@ bool TableHeap::InsertTuple(Row &row, Txn *txn) {
       page_id_t next_page_id;
       if(buffer_pool_manager_->NewPage(next_page_id)) {
         // 跳转到新页并连接到原有链表
+        buffer_pool_manager_->UnpinPage(now_page_id,false); //因为是没能成功插入的page，没有修改数据。
         now_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(next_page_id));
         now_page->Init(next_page_id,now_page_id,this->log_manager_,txn);
-        now_page->SetNextPageId(INVALID_PAGE_ID);
-        now_page->SetPrevPageId(now_page_id);
+        //now_page->SetNextPageId(INVALID_PAGE_ID);
+        //now_page->SetPrevPageId(now_page_id); ---UPDATE----INIT里面已经进行了同样操作
       }
     }
   }
+  buffer_pool_manager_->UnpinPage(now_page_id,true); //这里是成功插入的page，dirty了
   return true;
 }
 
@@ -59,7 +66,7 @@ bool TableHeap::MarkDelete(const RowId &rid, Txn *txn) {
 /**
  * TODO: Student Implement
  */
-bool TableHeap::UpdateTuple(Row &row, const RowId &rid, Txn *txn) {
+bool TableHeap::UpdateTuple(Row &row, const RowId &rid, Txn *txn) { //rid??----------------------------------debug
   // 我在这一部分修改了table_page中update的返回值用于判断更新失败的原因并尝试解决由于空间不足导致的问题，英文注释部分就是table_page.cpp中注释
   LOG(INFO) << "---Into TableHeap::UpdateTuple---" << std::endl;
   if (row.GetSerializedSize(this->schema_) > PAGE_SIZE) {
@@ -98,6 +105,7 @@ bool TableHeap::UpdateTuple(Row &row, const RowId &rid, Txn *txn) {
             return false;
           }
   }
+  buffer_pool_manager_->UnpinPage(page->GetPageId(),true);
 }
 /**
  * TODO: Student Implement
@@ -143,10 +151,11 @@ bool TableHeap::GetTuple(Row *row, Txn *txn) {
   // 我参考的代码部分需要在这里unpinpage，不过我不是很理解，就没加
   bool result = page->GetTuple(row, schema_, txn, lock_manager_);
   page->RUnlatch();
+  buffer_pool_manager_->UnpinPage(rid.GetPageId(),true);
   return result;
 }
 
-void TableHeap::DeleteTable(page_id_t page_id) {
+void TableHeap::DeleteTable(page_id_t page_id) { //删整个堆表
   LOG(INFO) << "---Into TableHeap::DeleteTable---" << std::endl;
   if (page_id != INVALID_PAGE_ID) {
     auto temp_table_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(page_id));  // 删除table_heap
@@ -171,13 +180,14 @@ TableIterator TableHeap::Begin(Txn *txn) {
   RowId *first_rid;
   while (page_now != nullptr) {
     page_now->RLatch();
-    if (page_now->GetFirstTupleRid(first_rid)) {
+    if (page_now->GetFirstTupleRid(first_rid)) { //防止是空页
       page_now->RUnlatch();
       break;
     }
     page_now->RUnlatch();
     page_now = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(page_now->GetNextPageId()));
   }
+  buffer_pool_manager_->UnpinPage(page_now->GetPageId(), false);
   return TableIterator(this, RowId(*first_rid), txn);
 }
 

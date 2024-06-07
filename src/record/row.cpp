@@ -17,7 +17,7 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
   Field *f;
   for(uint32_t i = 0; i < column_size; i++) {
     f = fields_[i];
-    f->SerializeTo(buf);
+    f->SerializeTo(buf + buf_offset); // -----UPDATE------- 一个+buf_offset查了一年嘿嘿 wssb
     buf_offset += f->GetSerializedSize();
   }
 
@@ -25,16 +25,14 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
 }
 
 uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
-  LOG(INFO)<< "---Into Row::DeserializeFrom()---";
+//  LOG(INFO)<< "---Into Row::DeserializeFrom()---";
   ASSERT(schema != nullptr, "Invalid schema before serialize.");
   ASSERT(fields_.empty(), "Non empty field in row.");
   // replace with your code here
   uint32_t column_size = schema->GetColumnCount();
   uint32_t buf_offset = 0;
-  RowId row_id;
-
-  MACH_READ_FROM(RowId, buf+buf_offset, row_id);
-  buf_offset += sizeof(row_id);
+  //RowId row_id=MACH_READ_FROM(RowId, buf+buf_offset); --- UPDATE---- sizeof(Type)和sizeof(entity)是一样的。
+  buf_offset += sizeof(RowId);
 
   for(int i=0;i<int(column_size);i++){
     Field *f;

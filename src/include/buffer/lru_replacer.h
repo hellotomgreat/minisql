@@ -38,6 +38,7 @@ class LRUReplacer : public Replacer {
 
 private:
  std::list<frame_id_t> lru_list;
+
 };
 
 #endif  // MINISQL_LRU_REPLACER_H

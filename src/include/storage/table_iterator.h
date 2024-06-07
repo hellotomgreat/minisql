@@ -32,6 +32,9 @@ public:
 
 private:
   // add your own private member variables here
+  Row *pointer_to_row_;
+  TableHeap *table_heap_;
+  Txn *txn_;
 };
 
 #endif  // MINISQL_TABLE_ITERATOR_H

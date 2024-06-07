@@ -38,8 +38,10 @@ class BPlusTreeLeafPage : public BPlusTreePage {
 
   // helper methods
   page_id_t GetNextPageId() const;
+  page_id_t GetPrevPageId() const;
 
   void SetNextPageId(page_id_t next_page_id);
+  void SetPrevPageId(page_id_t prev_page_id);
 
   GenericKey *KeyAt(int index);
 
@@ -67,20 +69,21 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   // Split and Merge utility methods
   void MoveHalfTo(BPlusTreeLeafPage *recipient);
 
-  void MoveAllTo(BPlusTreeLeafPage *recipient);
+  void MoveAllTo(BPlusTreeLeafPage *recipient, int index);
 
   void MoveFirstToEndOf(BPlusTreeLeafPage *recipient);
 
   void MoveLastToFrontOf(BPlusTreeLeafPage *recipient);
 
  private:
-  void CopyNFrom(void *src, int size);
+  void CopyNFrom(void *src, int size, int index);
 
   void CopyLastFrom(GenericKey *key, const RowId value);
 
   void CopyFirstFrom(GenericKey *key, const RowId value);
 
   page_id_t next_page_id_{INVALID_PAGE_ID};
+  page_id_t prev_page_id_{INVALID_PAGE_ID};
 
   char data_[PAGE_SIZE - LEAF_PAGE_HEADER_SIZE];
 };

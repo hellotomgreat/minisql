@@ -92,7 +92,7 @@ uint32_t Column::DeserializeFrom(char *buf, Column *&column) {
 
   uint32_t len;
   uint32_t len_size = sizeof(len);
-  len  = MACH_READ_UINT32(buf+buf_offset,buf+buf_offset);
+  len  = MACH_READ_UINT32(buf+buf_offset);
   buf_offset += len_size;
 
   char *name  = new char[len];
@@ -101,7 +101,7 @@ uint32_t Column::DeserializeFrom(char *buf, Column *&column) {
 
   uint32_t table_ind;
   uint32_t table_ind_size = sizeof(table_ind);
-  table_ind = MACH_READ_UINT32(buf+buf_offset,buf+buf_offset);
+  table_ind = MACH_READ_UINT32(buf+buf_offset);
   buf_offset += table_ind_size;
 
   bool nullable;

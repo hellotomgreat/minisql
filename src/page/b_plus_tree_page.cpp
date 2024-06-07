@@ -17,7 +17,11 @@ bool BPlusTreePage::IsLeafPage() const {
  */
 bool BPlusTreePage::IsRootPage() const {
   // 如果是根节点则没有父节点
+  /*-----UPDATE-----
+   *那这个判断条件是这样写吗？我请问呢？？？
   return page_type_ != IndexPageType::INVALID_INDEX_PAGE;
+   */
+  return parent_page_id_ == INVALID_PAGE_ID;
 }
 
 /**

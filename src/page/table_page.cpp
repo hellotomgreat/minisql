@@ -142,7 +142,7 @@ void TablePage::RollbackDelete(const RowId &rid, Txn *txn, LogManager *log_manag
     SetTupleSize(slot_num, UnsetDeletedFlag(tuple_size));
   }
 }
-
+//用于获取当前page下给定rid对应的tuple数据，并存入row中返回
 bool TablePage::GetTuple(Row *row, Schema *schema, Txn *txn, LockManager *lock_manager) {
   ASSERT(row != nullptr && row->GetRowId().Get() != INVALID_ROWID.Get(), "Invalid row.");
   // Get the current slot number.

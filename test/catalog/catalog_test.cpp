@@ -44,6 +44,7 @@ TEST(CatalogTest, CatalogTableTest) {
   auto db_01 = new DBStorageEngine(db_file_name, true);
   auto &catalog_01 = db_01->catalog_mgr_;
   TableInfo *table_info = nullptr;
+  dberr_t ret = catalog_01->GetTable("table-1", table_info);
   ASSERT_EQ(DB_TABLE_NOT_EXIST, catalog_01->GetTable("table-1", table_info));
   std::vector<Column *> columns = {new Column("id", TypeId::kTypeInt, 0, false, false),
                                    new Column("name", TypeId::kTypeChar, 64, 1, true, false),
