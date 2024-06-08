@@ -80,10 +80,11 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
   if (init) {
     CatalogMeta *meta = new CatalogMeta();
     catalog_meta_ = meta;
+    FlushCatalogMetaPage();
     return;
   }
   // 将磁盘中的meta page读入内存
-  page_id_t meta_page_id = META_PAGE_ID;
+  page_id_t meta_page_id = CATALOG_META_PAGE_ID;
   Page *meta_page = buffer_pool_manager_->FetchPage(meta_page_id);
   char *meta_page_ptr = meta_page->GetData();
   catalog_meta_ = CatalogMeta::DeserializeFrom(meta_page_ptr);
@@ -97,7 +98,7 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
       TableMetadata::DeserializeFrom(table_meta_page_ptr, table_meta);
       TableHeap *table_heap;
       // 这里我不太理解，就是按照看到要初始化info需要heap,然后从meta中提取符合语法要求的内容填写进去搞了一个heap出来
-      table_heap->Create(buffer_pool_manager_,table_meta->GetTableId(),table_meta->GetSchema(),log_manager_,lock_manager_);
+      table_heap-TableHeap::Create(buffer_pool_manager_,table_meta->GetTableId(),table_meta->GetSchema(),log_manager_,lock_manager_);
       TableInfo *table_info;
       table_info->Init(table_meta, table_heap);
       // 获得tableinfo和tablemeta后开始建立映射关系
@@ -149,8 +150,9 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
   if (!buffer_pool_manager_->NewPage(table_meta_page_id)) {
     return DB_FAILED;
   }
+  Schema *deepcopy_schema = Schema::DeepCopySchema(schema);
   // 创建TableMetadata
-  TableMetadata *table_meta = TableMetadata::Create(table_id, table_name, table_meta_page_id, schema);
+  TableMetadata *table_meta = TableMetadata::Create(table_id, table_name, table_meta_page_id, deepcopy_schema);
   if (table_meta == nullptr) {
     return DB_FAILED;
   }
@@ -173,10 +175,12 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
   catalog_meta_->SerializeTo(catalog_meta_page_ptr);
   buffer_pool_manager_->UnpinPage(META_PAGE_ID, true);
   // 创建TableHeap
-  TableHeap *table_heap = TableHeap::Create(buffer_pool_manager_, schema, txn,log_manager_, lock_manager_);
+
+  TableHeap *table_heap = TableHeap::Create(buffer_pool_manager_, deepcopy_schema, txn,log_manager_, lock_manager_);
   if (table_heap == nullptr) {
     return DB_FAILED;
   }
+
   // 初始化TableInfo
   table_info = TableInfo::Create();
   table_info->Init(table_meta, table_heap);

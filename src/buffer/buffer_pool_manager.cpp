@@ -136,7 +136,6 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
   // 4.   Set the page ID output parameter. Return a pointer to P.
   page_id = P->GetPageId();
   return P;
-
 }
 
 /**
