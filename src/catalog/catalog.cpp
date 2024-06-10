@@ -147,27 +147,28 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
   // 申请一个新的page，并将table的元数据写入其中
   page_id_t table_meta_page_id;
   table_id_t table_id = next_table_id_++;
-  if (!buffer_pool_manager_->NewPage(table_meta_page_id)) {
+  Page *table_meta_page = nullptr;
+  if ((table_meta_page = buffer_pool_manager_->NewPage(table_meta_page_id)) == nullptr) {
     return DB_FAILED;
   }
   Schema *deepcopy_schema = Schema::DeepCopySchema(schema);
   // 创建TableMetadata
   TableMetadata *table_meta = TableMetadata::Create(table_id, table_name, table_meta_page_id, deepcopy_schema);
+  catalog_meta_->table_meta_pages_[table_id] = table_meta_page_id;
+  catalog_meta_->table_meta_pages_[next_table_id_] = -1;
+
   if (table_meta == nullptr) {
     return DB_FAILED;
   }
   // 序列化TableMetadata到页面
-  Page *table_meta_page = buffer_pool_manager_->FetchPage(table_meta_page_id);
-  if (table_meta_page == nullptr) {
-    return DB_FAILED;
-  }
+
   char *table_meta_page_ptr = table_meta_page->GetData();
   table_meta->SerializeTo(table_meta_page_ptr);
   buffer_pool_manager_->UnpinPage(table_meta_page_id, true);
   // 更新catalog metadata
   catalog_meta_->table_meta_pages_.emplace(table_id, table_meta_page_id);
   // 序列化CatalogMeta到元数据页面
-  Page *catalog_meta_page = buffer_pool_manager_->FetchPage(META_PAGE_ID);
+  Page *catalog_meta_page = buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID);
   if (catalog_meta_page == nullptr) {
     return DB_FAILED;
   }
@@ -236,8 +237,9 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   page_id_t index_meta_page_id;
   index_id_t index_id = next_index_id_;
   next_index_id_++;
+  Page *index_meta_page = nullptr;
   buffer_pool_manager_->NewPage(index_meta_page_id);
-  if (index_meta_page_id== INVALID_PAGE_ID) {
+  if ((index_meta_page = buffer_pool_manager_->NewPage(index_meta_page_id))==nullptr) {
     return DB_FAILED;
   }
   table_id_t table_id = table_names_.at(table_name);
@@ -246,17 +248,13 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   uint32_t key_index;
   // 根据初始化参数要求倒推，需要获得key_map
   for(auto key:index_keys) {
-    if(table_schema->GetColumnIndex(key,key_index) != DB_INDEX_NOT_FOUND)
+    if(table_schema->GetColumnIndex(key,key_index) != DB_COLUMN_NAME_NOT_EXIST)
       key_map.push_back(key_index);
     else
       return DB_COLUMN_NAME_NOT_EXIST;
   }
   IndexMetadata *index_meta = IndexMetadata::Create(index_id, index_name, table_id,key_map);
   if (index_meta == nullptr) {
-    return DB_FAILED;
-  }
-  Page *index_meta_page = buffer_pool_manager_->FetchPage(index_meta_page_id);
-  if (index_meta_page == nullptr) {
     return DB_FAILED;
   }
   char *index_meta_page_ptr = index_meta_page->GetData();

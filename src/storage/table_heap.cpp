@@ -33,11 +33,12 @@ bool TableHeap::InsertTuple(Row &row, Txn *txn) {
     else{
       // 如果已经到链表的尽头，则创建一个新的页，并插入
       page_id_t next_page_id;
-      if(buffer_pool_manager_->NewPage(next_page_id)) {
+      TablePage *next_page = nullptr;
+      if((next_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->NewPage(next_page_id)->GetData()))!=nullptr) {
         // 跳转到新页并连接到原有链表
         buffer_pool_manager_->UnpinPage(now_page_id,false); //因为是没能成功插入的page，没有修改数据。
-        now_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(next_page_id));
-        now_page->Init(next_page_id,now_page_id,this->log_manager_,txn);
+        next_page->Init(next_page_id,now_page_id,this->log_manager_,txn);
+        now_page = next_page;
         //now_page->SetNextPageId(INVALID_PAGE_ID);
         //now_page->SetPrevPageId(now_page_id); ---UPDATE----INIT里面已经进行了同样操作
       }

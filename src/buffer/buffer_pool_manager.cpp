@@ -48,18 +48,18 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   if (!free_list_.empty()) {
     frame_id = free_list_.front();
     free_list_.pop_front();
-    R = &pages_[frame_id];
   }
   else {
     frame_id_t victim_id;
-    if(replacer_->Victim(&victim_id)) {
-      R = &pages_[victim_id];
+    if(replacer_->Victim(&frame_id)) {
     }
     else {
       //LOG(INFO)<< "--IN--FetchPage: NoPoolSpace return"<<std::endl;
       return nullptr;
     }
   }
+  R = &pages_[frame_id];
+  replacer_->Pin(frame_id);
   // 2.     If R is dirty, write it back to the disk.
   if(R->IsDirty()) {
     disk_manager_->WritePage(R->page_id_, R->data_);
@@ -70,11 +70,10 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   }
   // 3.     *****Delete R from the page table and insert P.这里我不知道P的信息哪里来的，主要是困惑是否需要将R的pageid,frameid继承到P中
   // 应当从disk中找到P---若disk中也没有？应当返回INVALID_PAGEID?
-  frame_id_t R_frame_id = page_table_.find(R->page_id_)->second;
   page_table_.erase(R->page_id_);
   P = R;
   P->page_id_ = page_id;
-  page_table_.insert(std::make_pair(P->page_id_, R_frame_id));
+  page_table_.insert(std::make_pair(P->page_id_, frame_id));
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
   disk_manager_->ReadPage(page_id, P->GetData());
   //LOG(INFO) << "In **FetchPage**: Successfully Get Page With Data:"<<P->GetData()<<std::endl;
@@ -133,9 +132,12 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
     disk_manager_->WritePage(P->page_id_, P->data_);
     P->is_dirty_ = false;
   }
+  P->pin_count_=1;
+  replacer_->Pin(frame_id);
   // 4.   Set the page ID output parameter. Return a pointer to P.
   page_id = P->GetPageId();
   return P;
+
 }
 
 /**

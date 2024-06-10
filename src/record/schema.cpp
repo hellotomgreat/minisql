@@ -12,7 +12,7 @@ uint32_t Schema::SerializeTo(char *buf) const {
   uint32_t buf_offset = sizeof(magic_number);
   // 序列化列数
   uint32_t column_num = GetColumnCount();
-  MACH_WRITE_UINT32(buf + buf_offset, magic_number);
+  MACH_WRITE_UINT32(buf + buf_offset, column_num);
   buf_offset += sizeof(column_num);
   // 序列化列
   for(auto column: this->GetColumns()) {
@@ -33,7 +33,8 @@ uint32_t Schema::GetSerializedSize() const {
   size += sizeof(uint32_t); // 序列化魔数大小
   size += sizeof(uint32_t); // 序列化列数大小
   for(auto column: this->GetColumns()) {
-    size += column->GetSerializedSize();
+    uint32_t column_size = column->GetSerializedSize();
+    size += column_size;
   }
   size += sizeof(bool);
   return size;
@@ -44,7 +45,7 @@ uint32_t Schema::DeserializeFrom(char *buf, Schema *&schema) {
   LOG(INFO) << "---Into Schema::DeserializeFrom() ---";
   uint32_t buf_offset = 0;
   uint32_t magic_number = MACH_READ_FROM(uint32_t, buf+buf_offset);
-  ASSERT(magic_number == Column::COLUMN_MAGIC_NUM, "Invalid magic number");
+  ASSERT(magic_number == SCHEMA_MAGIC_NUM, "Invalid magic number");
   buf_offset += sizeof(magic_number);
   // 反序列化列数
   uint32_t column_num = MACH_READ_FROM(uint32_t, buf+buf_offset);

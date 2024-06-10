@@ -138,20 +138,19 @@ void BPlusTree::StartNewTree(GenericKey *key, const RowId &value) {
   /*-----UPDATE-----
    *NewPage不Pin了之后优化了代码结构
    */
-  if (buffer_pool_manager_->NewPage(new_root_page_id) == nullptr) {
+  Page *new_root_page = nullptr;
+  if ((new_root_page = buffer_pool_manager_->NewPage(new_root_page_id)) == nullptr) {
     LOG(FATAL) << "out of memory";
     return;
   }
-  Page *new_root_page = buffer_pool_manager_->FetchPage(new_root_page_id);
   root_page_id_ = new_root_page_id;
   UpdateRootPageId(true); //insert
   // 申请一个新的叶子节点
   page_id_t new_leaf_page_id;
-
-  if (buffer_pool_manager_->NewPage(new_leaf_page_id) == nullptr) {
+  LeafPage *new_leaf_page = nullptr;
+  if ((new_leaf_page = reinterpret_cast<LeafPage *>(buffer_pool_manager_->NewPage(new_leaf_page_id)->GetData())) == nullptr) {
     LOG(FATAL) << "out of memory";
   }
-  LeafPage *new_leaf_page = reinterpret_cast<LeafPage *>(buffer_pool_manager_->FetchPage(new_leaf_page_id));
   // 对叶子节点的内容进行初始化和插入
   /*-----UPDATE------
    * 还需要加上next_page_id的更新
@@ -217,11 +216,11 @@ BPlusTreeInternalPage *BPlusTree::Split(InternalPage *node, Txn *transaction) {
   /*-----UPDATE-----
    *NewPage不Pin了之后优化了代码结构
    */
-  if (buffer_pool_manager_->NewPage(new_page_id) == nullptr) {
+  Page *new_page = nullptr;
+  if ((new_page = buffer_pool_manager_->NewPage(new_page_id)) == nullptr) {
     LOG(FATAL) << "out of memory";
     return nullptr;
   }
-  Page *new_page = buffer_pool_manager_->FetchPage(new_page_id);
   // 转化为新的中间节点，并且将已有内容的一半移动到新的节点
   InternalPage *new_internal_node = reinterpret_cast<InternalPage *>(new_page->GetData());
   new_internal_node->Init(new_page_id, node->GetParentPageId(), processor_.GetKeySize(), internal_max_size_); // ---bug--- 0->KeySize()
@@ -242,11 +241,11 @@ BPlusTreeLeafPage *BPlusTree::Split(LeafPage *node, Txn *transaction) {
   /*-----UPDATE-----
    *NewPage不Pin了之后优化了代码结构
    */
-  if (buffer_pool_manager_->NewPage(new_page_id) == nullptr) {
+  Page *new_page = nullptr;
+  if ((new_page = buffer_pool_manager_->NewPage(new_page_id)) == nullptr) {
     LOG(FATAL) << "out of memory";
     return nullptr;
   }
-  Page *new_page = buffer_pool_manager_->FetchPage(new_page_id);
   // 转化为新的叶子节点，并且将已有内容的一半移动到新的节点
   /*-----UPDATE-----
    *SPLIT 后应该注意next_page_id的变更，用于index遍历
@@ -287,11 +286,11 @@ void BPlusTree::InsertIntoParent(BPlusTreePage *old_node, GenericKey *key, BPlus
   if (old_node->IsRootPage()) {
     // 如果是根节点，则创建一个新的根节点，并且插入新的键值对
     page_id_t new_root_page_id;
-    if (buffer_pool_manager_->NewPage(new_root_page_id) == nullptr) {
+    Page *new_root_page = nullptr;
+    if ((new_root_page = buffer_pool_manager_->NewPage(new_root_page_id)) == nullptr) {
       LOG(FATAL) << "out of memory";
       return;
     }
-    Page *new_root_page = buffer_pool_manager_->FetchPage(new_root_page_id);
     InternalPage *new_root = reinterpret_cast<InternalPage *>(new_root_page->GetData());
     new_root->Init(new_root_page_id, INVALID_PAGE_ID, processor_.GetKeySize(), internal_max_size_);
     new_root->PopulateNewRoot(old_node->GetPageId(), key, new_node->GetPageId());

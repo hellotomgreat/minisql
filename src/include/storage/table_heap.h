@@ -117,9 +117,9 @@ class TableHeap {
     * UPDATE: 这里要加上初始化。
     * 二更：一开始想到要init，又是一顿找。
     */
-   buffer_pool_manager->NewPage(first_page_id_);
-   TablePage *first_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(first_page_id_));
+   TablePage *first_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->NewPage(first_page_id_)->GetData());
    first_page->Init(first_page_id_,INVALID_PAGE_ID,log_manager_,txn);
+   buffer_pool_manager_->UnpinPage(first_page_id_,true);
   };
 
   explicit TableHeap(BufferPoolManager *buffer_pool_manager, page_id_t first_page_id, Schema *schema,
