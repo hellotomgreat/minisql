@@ -80,7 +80,6 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
   if (init) {
     CatalogMeta *meta = new CatalogMeta();
     catalog_meta_ = meta;
-    FlushCatalogMetaPage();
     return;
   }
   // 将磁盘中的meta page读入内存
@@ -96,9 +95,10 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
       char *table_meta_page_ptr = table_meta_page->GetData();
       TableMetadata *table_meta;
       TableMetadata::DeserializeFrom(table_meta_page_ptr, table_meta);
-      TableHeap *table_heap;
       // 这里我不太理解，就是按照看到要初始化info需要heap,然后从meta中提取符合语法要求的内容填写进去搞了一个heap出来
-      table_heap-TableHeap::Create(buffer_pool_manager_,table_meta->GetTableId(),table_meta->GetSchema(),log_manager_,lock_manager_);
+      page_id_t table_page_id = table_meta->GetTableId();
+      Schema *schema = table_meta->GetSchema();
+      TableHeap *table_heap=TableHeap::Create(buffer_pool_manager_,table_page_id,schema,log_manager_,lock_manager_);
       TableInfo *table_info;
       table_info->Init(table_meta, table_heap);
       // 获得tableinfo和tablemeta后开始建立映射关系
@@ -146,46 +146,41 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
   }
   // 申请一个新的page，并将table的元数据写入其中
   page_id_t table_meta_page_id;
-  table_id_t table_id = next_table_id_++;
+
   Page *table_meta_page = nullptr;
   if ((table_meta_page = buffer_pool_manager_->NewPage(table_meta_page_id)) == nullptr) {
     return DB_FAILED;
   }
-  Schema *deepcopy_schema = Schema::DeepCopySchema(schema);
-  // 创建TableMetadata
-  TableMetadata *table_meta = TableMetadata::Create(table_id, table_name, table_meta_page_id, deepcopy_schema);
-  catalog_meta_->table_meta_pages_[table_id] = table_meta_page_id;
-  catalog_meta_->table_meta_pages_[next_table_id_] = -1;
 
+  TableSchema *deepcopy_schema = TableSchema::DeepCopySchema(schema);
+  // 创建TableMetadata
+  table_id_t table_id = next_table_id_++;
+  page_id_t table_root_page_id;
+  buffer_pool_manager_->NewPage(table_root_page_id);
+  TableMetadata *table_meta = TableMetadata::Create(table_id, table_name, table_root_page_id, deepcopy_schema);
   if (table_meta == nullptr) {
     return DB_FAILED;
   }
   // 序列化TableMetadata到页面
-
   char *table_meta_page_ptr = table_meta_page->GetData();
   table_meta->SerializeTo(table_meta_page_ptr);
   buffer_pool_manager_->UnpinPage(table_meta_page_id, true);
-  // 更新catalog metadata
-  catalog_meta_->table_meta_pages_.emplace(table_id, table_meta_page_id);
-  // 序列化CatalogMeta到元数据页面
-  Page *catalog_meta_page = buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID);
-  if (catalog_meta_page == nullptr) {
-    return DB_FAILED;
-  }
-  char *catalog_meta_page_ptr = catalog_meta_page->GetData();
-  catalog_meta_->SerializeTo(catalog_meta_page_ptr);
-  buffer_pool_manager_->UnpinPage(META_PAGE_ID, true);
-  // 创建TableHeap
+  buffer_pool_manager_->UnpinPage(table_root_page_id,true);
 
+  // 更新catalog metadata
+  catalog_meta_->table_meta_pages_[table_id] = table_meta_page_id;
+  catalog_meta_->table_meta_pages_[next_table_id_] = -1;
+
+  // 创建TableHeap
   TableHeap *table_heap = TableHeap::Create(buffer_pool_manager_, deepcopy_schema, txn,log_manager_, lock_manager_);
   if (table_heap == nullptr) {
     return DB_FAILED;
   }
-
   // 初始化TableInfo
   table_info = TableInfo::Create();
   table_info->Init(table_meta, table_heap);
   // 更新内存中的表信息
+  FlushCatalogMetaPage();
   tables_.emplace(table_id, table_info);
   table_names_.emplace(table_name, table_id);
   return DB_SUCCESS;
@@ -235,15 +230,16 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
     return DB_INDEX_ALREADY_EXIST;
   }
   page_id_t index_meta_page_id;
-  index_id_t index_id = next_index_id_;
-  next_index_id_++;
+
   Page *index_meta_page = nullptr;
-  buffer_pool_manager_->NewPage(index_meta_page_id);
   if ((index_meta_page = buffer_pool_manager_->NewPage(index_meta_page_id))==nullptr) {
     return DB_FAILED;
   }
+
   table_id_t table_id = table_names_.at(table_name);
   TableSchema *table_schema = tables_.at(table_id)->GetSchema();
+  table_schema->DeepCopySchema(table_schema);
+
   std::vector<uint32_t> key_map;
   uint32_t key_index;
   // 根据初始化参数要求倒推，需要获得key_map
@@ -253,6 +249,8 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
     else
       return DB_COLUMN_NAME_NOT_EXIST;
   }
+  // 创建IndexMetadata
+  index_id_t index_id = next_index_id_++;
   IndexMetadata *index_meta = IndexMetadata::Create(index_id, index_name, table_id,key_map);
   if (index_meta == nullptr) {
     return DB_FAILED;
@@ -260,25 +258,18 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   char *index_meta_page_ptr = index_meta_page->GetData();
   // 序列化index metadata
   index_meta->SerializeTo(index_meta_page_ptr);
+  buffer_pool_manager_->UnpinPage(index_meta_page_id, true);
   // 更新catalog metadata
   catalog_meta_->index_meta_pages_.emplace(index_id, index_meta_page_id);
+  catalog_meta_->index_meta_pages_.emplace(next_index_id_, -1);
   // 创建IndexInfo
   index_info = IndexInfo::Create();
   index_info->Init(index_meta, tables_.at(table_id), buffer_pool_manager_);
   // 更新内存中的索引信息
   indexes_.emplace(index_id, index_info);
-  index_names_.emplace(index_name, index_id);
+  index_names_[table_name][index_name]=index_id;
+  FlushCatalogMetaPage();
 
-  // 序列化CatalogMeta到元数据页面
-  Page *catalog_meta_page = buffer_pool_manager_->FetchPage(META_PAGE_ID);
-  if (catalog_meta_page == nullptr) {
-    return DB_FAILED;
-  }
-  char *catalog_meta_page_ptr = catalog_meta_page->GetData();
-  catalog_meta_->SerializeTo(catalog_meta_page_ptr);
-
-  buffer_pool_manager_->UnpinPage(index_meta_page_id, true);
-  buffer_pool_manager_->UnpinPage(META_PAGE_ID, true);
   return DB_SUCCESS;
 }
 /**
@@ -304,6 +295,7 @@ dberr_t CatalogManager::GetTableIndexes(const std::string &table_name, std::vect
   LOG(INFO)<< "into CatalogManager::GetTableIndexes";
   if (table_names_.count(table_name) <= 0)
     return DB_TABLE_NOT_EXIST;
+  if(index_names_.count(table_name) <= 0) return DB_INDEX_NOT_FOUND;
   unordered_map<string, unordered_map<string, index_id_t>>::mapped_type index_name_to_id = index_names_.at(table_name);
   for(auto index_id:index_name_to_id) {
     indexes.push_back(indexes_.at(index_id.second));
@@ -328,6 +320,7 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
   }
   // 最后删除表的表信息
   tables_.erase(table_id);
+  table_names_.erase(table_name);
   // 序列化CatalogMeta到元数据页面
   Page *catalog_meta_page = buffer_pool_manager_->FetchPage(META_PAGE_ID);
   if (catalog_meta_page == nullptr) {
